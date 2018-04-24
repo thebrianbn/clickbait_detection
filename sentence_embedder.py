@@ -10,11 +10,12 @@ from gensim.models import Word2Vec
 import nltk
 from nltk.stem.snowball import SnowballStemmer
 
-def sentence_embedder(data):
+def sentence_embedder(data, word2vec):
     '''creates sentence embeddings given a column of tokens'''
-    word_embeddings = Word2Vec(data, min_count = 1, size = 100)
+    word_embeddings = word2vec
     
-    max_tokens = data.apply(len).max()
+    #max_tokens = data.apply(len).max()
+    max_tokens = 37 #max amount of tokens in postText
 
     all_arrays = []
     for i in range(len(data)):
@@ -51,6 +52,7 @@ def extract_categories(data):
             
 
 def stem(data):
+    
     stemmer = SnowballStemmer("english")
     for i in range(len(data)):
         new_words = []

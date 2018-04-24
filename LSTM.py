@@ -12,7 +12,7 @@ from tensorflow.contrib import rnn
 from sentence_embedder import sentence_embedder, extract_categories, stem
 from sklearn.model_selection import train_test_split
 import pandas as pd
-        
+from gensim.models import Word2Vec
 
 
 def merge_helper(data):
@@ -57,7 +57,12 @@ def next_batch(data, feature_columns, target_column, start_index, batch_size):
 total_data = tokenise_merged_data(model = "lstm")
 
 #NLP: Create Word Embeddings
-total_data.postText = sentence_embedder(extract_categories(stem(total_data.postText.head(21997))))
+total_data.postText = extract_categories(stem(total_data.postText.head(21997)))
+
+word_embeddings = Word2Vec(total_data.postText, min_count = 1, size = 100)
+
+total_data.postText = sentence_embedder(total_data.postText, word2vec = word_embeddings)
+
 
 X_train, X_test, y_train, y_test = train_test_split(
         total_data.postText, total_data.truthClass, test_size=.2, random_state=0)
@@ -74,7 +79,7 @@ OUTPUT_NUM = 2
 INPUT_NUM = max_array
 
 EPOCHS = 500
-LEARNING_RATE = 0.00015
+LEARNING_RATE = 0.005
 TRAIN_STEPS = 100
 BATCH_SIZE = 160
 
@@ -82,20 +87,21 @@ x_train = tf.placeholder(tf.float32, [None, INPUT_NUM])
 y_train = tf.placeholder(tf.float32, [None, OUTPUT_NUM])
 
 weights = {"hidden": tf.Variable(tf.random_normal([INPUT_NUM, HIDDEN_NUM])),
-           "output": tf.Variable(tf.random_normal([2 * HIDDEN_NUM, OUTPUT_NUM]))}
+           "output": tf.Variable(tf.random_normal([HIDDEN_NUM, OUTPUT_NUM]))}
 biases = {"hidden": tf.Variable(tf.random_normal([HIDDEN_NUM])),
           "output": tf.Variable(tf.random_normal([OUTPUT_NUM]))}
 
-pred = tf.nn.softmax(bi_lstm(x_train, weights, biases))
+#pred = tf.nn.softmax(bi_lstm(x_train, weights, biases))
 
-#hidden_layer = tf.nn.relu(tf.add(tf.matmul(x_train, weights["hidden"]), biases["hidden"]))
-#output_layer = tf.matmul(hidden_layer, weights["output"]) + biases["output"]
+hidden_layer = tf.nn.relu(tf.add(tf.matmul(x_train, weights["hidden"]), biases["hidden"]))
+output_layer = tf.matmul(hidden_layer, weights["output"]) + biases["output"]
 
-loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = y_train, logits = pred))
+
+loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = y_train, logits = output_layer))
 #loss = tf.reduce_mean(tf.contrib.legacy_seq2seq.sequence_loss_by_example(targets = y_train, logits = pred))
 optimizer = tf.train.RMSPropOptimizer(LEARNING_RATE).minimize(loss)
 
-correct_prediction = tf.equal(tf.argmax(pred,1), tf.argmax(y_train,1))
+correct_prediction = tf.equal(tf.argmax(output_layer,1), tf.argmax(y_train,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 #prediction=tf.argmax(output_layer,1)
